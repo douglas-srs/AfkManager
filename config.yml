@@ -1,0 +1,66 @@
+#You can made all the actions you want but remember to name then as action1...action2...action3... and so on!
+#You can use colors in the messages, just use the real color codes, like this: &1, &2, &3, &a, &b, &c...
+afkmanager:
+  exempts: ''
+  money: 200
+  moveradius: 5
+  nomoneyaction:
+    enabled: true
+    action: kill
+    broadcast: true
+    bcmessage: '%NAME% got killed for being AFK and does not having enough money to pay!.'
+    alertplayer: true
+    playermessage: 'You''ve been killed for being AFK and does not having enough money to pay!'
+    log: true
+    command:
+  actions:
+    action1:
+      enabled: true
+      action: message
+      time: 60
+      broadcast: true
+      bcmessage: '%NAME% &awill lost money if he won''t back in 1 minute :P.'
+      alertplayer: true
+      playermessage: '&cYou will lost money for being AFK in 1 minute.'
+      log: true
+      command: 
+    action2:
+      enabled: true
+      action: money
+      time: 120
+      broadcast: true
+      bcmessage: '%NAME% lost %MONEY% money for being AFK.'
+      alertplayer: true
+      playermessage: 'You lost %MONEY% for being AFK.'
+      log: true
+      command:
+    action3:
+      enabled: true
+      action: kill
+      time: 180
+      broadcast: true
+      bcmessage: '%NAME% got killed for being AFK.'
+      alertplayer: true
+      playermessage: 'You''ve been killed for being AFK.'
+      log: true
+      command:
+    action4:
+      enabled: true
+      action: command
+      time: 240
+      broadcast: true
+      bcmessage: '%NAME% got smithed for being AFK.'
+      alertplayer: true
+      playermessage: 'You''ve been smithed for being AFK.'
+      log: true
+      command: 'lightning %NAME%'
+    action5:
+      enabled: true
+      action: kick
+      time: 300
+      broadcast: true
+      bcmessage: '%NAME% got kicked for being AFK.'
+      alertplayer: true
+      playermessage: 'You''ve been kicked for being AFK.'
+      log: true
+      command: 
