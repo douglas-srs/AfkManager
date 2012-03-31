@@ -1,16 +1,16 @@
 name: AfkManager
 main: com.douglas_srs.AfkManager.AfkManager
-version: 1.4
-website: http://www.mestrecraft.com.br/
+version: 2.0.1
+website: http://www.mestrecraft.com.br/threads/afkmanager.18/
 description: Manage AFK players!
 author: douglas_srs
+depend: [Vault]
 
 commands:
     afkmanager:
         description: Reloads the configuration from file.
         usage: /<command> reload
         aliases: am
-depend: [Vault]
 
 permissions:
     afkmanager.exempt:

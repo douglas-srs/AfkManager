@@ -1,19 +1,26 @@
 package com.douglas_srs.AfkManager;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
-
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.event.Event;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.PluginManager;
-
 import net.milkbowl.vault.economy.Economy;
 
 /**
@@ -26,29 +33,38 @@ public class AfkManager extends JavaPlugin
 {
 	public static AfkManager instance;
 	public static Economy economy = null;
-    public static final Logger log = Logger.getLogger("Minecraft");
+	public static Logger log = Logger.getLogger("Minecraft");
     private final AfkManagerPlayerListener playerListener = new AfkManagerPlayerListener(this);
-    public Boolean usingpermissions = false;
     public static HashMap<String, Long> lastonline = new HashMap<String, Long>();
-    public Integer afkmanagerseconds = 180;
-    public String afkmanagerkickmessage = "You've been kicked for being AFK.";
-    public String afkmanagerkillmessage = "You've been killed for being AFK.";
-    public String afkmanagermoneymessage = "You lost %MONEY% for being AFK.";
-    public String afkmanagerkicklog = "%NAME% got kicked for being AFK.";
-    public String afkmanagerkilllog = "%NAME% got killed for being AFK.";
-    public String afkmanagermoneylog = "%NAME% lost 0 money for being AFK.";
-    public String afkmanagernomoneylog = "%NAME% got killed for being AFK and does not having enough money to pay!.";
-    public String afkmanagernomoney = "You've been killed for being AFK and does not having enough money to pay!";
-    public Boolean afkmanagerbroadcast = false;
-    public Boolean afkmanagerkillifnomoney = true;
+    public static HashMap<String, Location> lastposition = new HashMap<String, Location>();
     public List<String> afkmanagerexempts = Arrays.asList("");
-    public Boolean afkmanagerkick = true;
-    public Boolean afkmanagerkill = false;
-    public Boolean normalkill = true;
-    public int afkmanagermoney = 0;
-    public String plugintag = ChatColor.AQUA + "[AfkManager]" + ChatColor.WHITE;
-    public String plugintagnocolor = "[AfkManager]";
-
+    public String plugintag = ChatColor.AQUA + "[AFKManager]" + ChatColor.WHITE;
+    public String defaultKey = "afkmanager.actions.";
+    public Integer money = 0;
+    public Integer moveradius = 5;
+    
+    public Boolean enabled = false;
+    public String action = null;
+    public Integer time = 0;
+    public Boolean broadcast = false;
+    public String bcmessage = null;
+    public Boolean alertplayer = false;
+    public String playermessage = null;
+    public Boolean clog = false;
+    public String command = null;
+    
+    //MONEY STUFF
+    public Boolean nomoneyenabled = false;
+    public String nomoneyaction = null;
+    public Integer nomoneytime = 0;
+    public Boolean nomoneybroadcast = false;
+    public String nomoneybcmessage = null;
+    public Boolean nomoneyalertplayer = false;
+    public String nomoneyplayermessage = null;
+    public Boolean nomoneyclog = false;
+    public String nomoneycommand = null;
+    
+    //Function to get the economy plugin using Vault
     private Boolean setupEconomy()
     {
         RegisteredServiceProvider<Economy> economyProvider = getServer().getServicesManager().getRegistration(net.milkbowl.vault.economy.Economy.class);
@@ -59,27 +75,54 @@ public class AfkManager extends JavaPlugin
         return (economy != null);
     }
     
+    //Method used to create a new config if there is no one
+    private void firstRun() throws Exception {
+        if(!AfkManagerConfig.configFile.exists()){
+        	AfkManagerConfig.configFile.getParentFile().mkdirs();
+            copy(getResource("config.yml"), AfkManagerConfig.configFile);
+        }
+    }
+    
+    //Method used to copy files
+    private void copy(InputStream in, File file) {
+        try {
+            OutputStream out = new FileOutputStream(file);
+            byte[] buf = new byte[1024];
+            int len;
+            while((len=in.read(buf))>0){
+                out.write(buf,0,len);
+            }
+            out.close();
+            in.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    //Method to send a message to all players except the current one
+    public void broadcastServer(Player pAtual, String Message)
+    {
+    	for(Player p : getServer().getOnlinePlayers()){
+    		if (p.getName() != pAtual.getName())
+    		p.sendMessage(Message);
+      	  }
+    }
+    
     public void onEnable()
     {
     	setupEconomy();
     	instance = this;
         PluginManager pm = getServer().getPluginManager();
-        pm.registerEvent(Event.Type.PLAYER_JOIN, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_BED_LEAVE, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_COMMAND_PREPROCESS, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_DROP_ITEM, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_INTERACT_ENTITY, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_INTERACT, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_ITEM_HELD, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_CHAT, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_MOVE, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_PICKUP_ITEM, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_TOGGLE_SNEAK, playerListener, Event.Priority.Normal, this);
-        //pm.registerEvent(Event.Type.ENTITY_DEATH, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_RESPAWN, playerListener, Event.Priority.Normal, this);
-        pm.registerEvent(Event.Type.PLAYER_KICK, playerListener, Event.Priority.Low, this);
-
-        reload();
+        
+        pm.registerEvents(playerListener, this);
+        AfkManagerConfig.configFile = new File(getDataFolder(), "config.yml");
+        try {
+            firstRun();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        AfkManagerConfig.config = new YamlConfiguration();
+        AfkManagerConfig.loadYamls();       
 
         getServer().getScheduler().scheduleSyncRepeatingTask(this, new Runnable()
         {
@@ -87,115 +130,213 @@ public class AfkManager extends JavaPlugin
             {
                 for (Player player : getServer().getOnlinePlayers())
                 {
-                    if (!afkmanagerexempts.contains(player.getName().toLowerCase()))
+                    if (!afkmanagerexempts.contains(player.getName()))
                     {
                         if (!player.hasPermission("afkmanager.exempt"))
                         {
-                            if (lastonline.get(player.getName().toLowerCase()) == null)
+                            if (lastonline.get(player.getName()) == null)
                             {
-                                lastonline.put(player.getName().toLowerCase(),System.currentTimeMillis()/1000);
+                                lastonline.put(player.getName(),System.currentTimeMillis()/1000);
                             }
+                            
+                            FileConfiguration config = AfkManagerConfig.config;
+                            ConfigurationSection act = config.getConfigurationSection("afkmanager.actions");                  
+                            if (act != null) {
+                                for (String key : act.getKeys(false)) {
+                                	                                  
+                                    enabled = AfkManagerConfig.getConfigStatus(key);
+                                    action = AfkManagerConfig.getConfigAction(key).toLowerCase();
+                                    time = AfkManagerConfig.getConfigTime(key);
+                                    broadcast = AfkManagerConfig.getConfigBC(key);
+                                    bcmessage = plugintag + AfkManagerConfig.getConfigBCMessage(key);
+                                    bcmessage = bcmessage.replaceAll("&([0-9a-fA-Fk-kK-K])", "\u00a7$1");
+                                    if (bcmessage != null)
+                                    	bcmessage = bcmessage.replace("%NAME%",player.getName());
+                                    alertplayer = AfkManagerConfig.getConfigAlertPlayer(key);
+                                    playermessage = plugintag + AfkManagerConfig.getConfigPlayerMessage(key);
+                                    playermessage = playermessage.replaceAll("&([0-9a-fA-Fk-kK-K])", "\u00a7$1");
+                                    clog = AfkManagerConfig.getConfigLog(key);
+                                    command = AfkManagerConfig.getConfigCommand(key);
+                                    if (command != null)
+                                    	command = command.replace("%NAME%",player.getName());
+                                    
+                                    //MONEY STUFF
+                                    nomoneyenabled = AfkManagerConfig.getConfigNoMoneyStatus();
+                                    nomoneyaction = AfkManagerConfig.getConfigNoMoneyAction();
+                                    nomoneytime = AfkManagerConfig.getConfigNoMoneyTime();
+                                    nomoneybroadcast = AfkManagerConfig.getConfigNoMoneyBC();
+                                    nomoneybcmessage = plugintag + AfkManagerConfig.getConfigNoMoneyBCMessage();
+                                    nomoneybcmessage = nomoneybcmessage.replaceAll("&([0-9a-fA-Fk-kK-K])", "\u00a7$1");
+                                    if (nomoneybcmessage != null)
+                                    	nomoneybcmessage = nomoneybcmessage.replace("%NAME%",player.getName());
+                                    nomoneyalertplayer = AfkManagerConfig.getConfigNoMoneyAlertPlayer();
+                                    nomoneyplayermessage = plugintag + AfkManagerConfig.getConfigNoMoneyPlayerMessage();
+                                    nomoneyplayermessage = nomoneyplayermessage.replaceAll("&([0-9a-fA-Fk-kK-K])", "\u00a7$1");
+                                    nomoneyclog = AfkManagerConfig.getConfigNoMoneyLog();
+                                    nomoneycommand = AfkManagerConfig.getConfigNoMoneyCommand();
+                                    money = AfkManagerConfig.getConfigMoney();
+                                    moveradius = AfkManagerConfig.getConfigMoveRadius();
 
-                            if (lastonline.get(player.getName().toLowerCase()).longValue() < (System.currentTimeMillis()/1000)-afkmanagerseconds)
-                            {
-                            	
-                            	if (afkmanagermoney > 0) {
-                            	if (economy.has(player.getName(), afkmanagermoney)){
-                            		economy.withdrawPlayer(player.getName(), afkmanagermoney);
-                            		playerAction(player);
-                            		String moneymessage = afkmanagermoneylog;
-                            		moneymessage = moneymessage.replace("%NAME%",player.getName());
-                                	moneymessage = moneymessage.replace("%MONEY%",economy.format(afkmanagermoney));
-                            		player.sendMessage(plugintag + moneymessage);
-                            		String tempmessage = afkmanagermoneylog;
-                            		if (afkmanagermoneylog.trim() != "" && afkmanagermoneylog != null)
-                                    {
-                                    	tempmessage = afkmanagermoneylog.replace("%NAME%",player.getName());
-                                    	tempmessage = tempmessage.replace("%MONEY%",economy.format(afkmanagermoney));
-                                        log.info(plugintagnocolor + tempmessage);
+                                    if (nomoneycommand != null)
+                                    	nomoneycommand = nomoneycommand.replace("%NAME%",player.getName());
+                                        
+                                	Location loc = lastposition.get(player.getName());
+                                	Location newloc = player.getLocation();
+                                	if (loc == null) {
+                                		lastposition.put(player.getName(), newloc);
+                                	} else {
+                                	    //distance exceeded?
+                                	    if (loc.getWorld() != newloc.getWorld() || loc.distance(newloc) > moveradius) {
+                                	        //changed; re-put
+                                	    	playerAction(player);
+                                	    	lastposition.put(player.getName(), newloc);
+                                	    }
+                                	}
+                                    
+                                        if (lastonline.get(player.getName()).longValue() == (System.currentTimeMillis()/1000)-time)
+                                        {
+                                        	if (enabled){
+                                        		
+                                        	//MESSAGE
+                                            if (action.equals("message")){
+                                                if (alertplayer)
+                                                	player.sendMessage(playermessage);
+                                            		
+                                            		if (broadcast)
+                                            			broadcastServer(player, bcmessage);
+
+                                            		if (clog)
+                                                    		log.log(Level.INFO, bcmessage);
+                                            }	
+                                        		
+                                        	//KICK
+                                        	if (action.equals("kick")){
+                                                player.kickPlayer(playermessage);
+                                                if (broadcast)
+                                                	broadcastServer(player, bcmessage);
+                                                
+                                                if (clog)
+                                                		log.log(Level.INFO, bcmessage);
+                                        	}
+                                        	
+                                        	//KILL
+                                        	if (action.equals("kill")){
+                                        		player.damage(10000);
+                                        		
+                                        		if (alertplayer)
+                                            	player.sendMessage(playermessage);
+                                        		
+                                        		if (broadcast)
+                                        			broadcastServer(player, bcmessage);
+
+                                        		if (clog)
+                                                		log.log(Level.INFO, bcmessage);
+                                        		}
+                                        		                                       	
+                                        	//MONEY
+                                        	if (action.equals("money")){
+                                        		if (economy.has(player.getName(), money)){
+                                            		economy.withdrawPlayer(player.getName(), money);
+                                            		String moneymessage = playermessage;
+                                            		moneymessage = moneymessage.replace("%NAME%",player.getName());
+                                                	moneymessage = moneymessage.replace("%MONEY%",economy.format(money));
+                                                	if (alertplayer){
+                                            		player.sendMessage(moneymessage);
+                                                	}
+                                            		String tempmessage = "";
+                                            		
+                                            		if (broadcast)
+                                                    {
+                                            			tempmessage = bcmessage.replace("%MONEY%",economy.format(money));
+                                            			broadcastServer(player, tempmessage);
+                                                    } else
+
+                                                    if (clog){
+                                                    		tempmessage = bcmessage.replace("%MONEY%",economy.format(money));
+                                                    		log.log(Level.INFO, bcmessage);
+                                                    	}
+                                            		
+                                            	} else //PLAYER DOESN'T HAVE MONEY
+                                            	{
+                                            		if (nomoneyaction.equals("message")){
+                                                        if (nomoneyalertplayer)
+                                                        	player.sendMessage(nomoneyplayermessage);
+                                                    		
+                                                    		if (nomoneybroadcast)
+                                                    			broadcastServer(player, nomoneybcmessage);
+
+                                                    		if (nomoneyclog)
+                                                            		log.log(Level.INFO, nomoneybcmessage);
+                                            		}
+                                            		
+                                            		if (nomoneyaction.equals("kill")){
+                                            			player.damage(10000);
+                                                		
+                                                		if (nomoneyalertplayer)
+                                                    	player.sendMessage(nomoneyplayermessage);
+                                                		
+                                                		if (nomoneybroadcast)
+                                                			broadcastServer(player, nomoneybcmessage);
+
+                                                		if (nomoneyclog)
+                                                        		log.log(Level.INFO, nomoneybcmessage);
+                                            		}
+
+                                            		if (nomoneyaction.equals("kick")){
+                                            			player.kickPlayer(playermessage);
+                                                        if (nomoneybroadcast)
+                                                        	broadcastServer(player, nomoneybcmessage);
+                                                        
+                                                        if (nomoneyclog)
+                                                        		log.log(Level.INFO, nomoneybcmessage);
+                                            		}
+                                            		
+                                            		if (nomoneyaction.equals("command")){
+                                            			getServer().dispatchCommand(Bukkit.getConsoleSender(), nomoneycommand);
+                                                		if (nomoneyalertplayer)
+                                                        	player.sendMessage(nomoneyplayermessage);
+                                                        
+                                                		if (nomoneybroadcast)
+                                                			broadcastServer(player, nomoneybcmessage);
+
+                                                		if (nomoneyclog)
+                                                        		log.log(Level.INFO, nomoneybcmessage);
+                                            		}
+                                            		
+                                                }
+                                            	}
+                                        	
+                                        	//COMMAND
+                                        	if (action.equals("command")){
+                                        		getServer().dispatchCommand(Bukkit.getConsoleSender(), command);
+                                        		if (alertplayer)
+                                                	player.sendMessage(playermessage);
+                                                
+                                        		if (broadcast)
+                                        			broadcastServer(player, bcmessage);
+
+                                        		if (clog)
+                                                		log.log(Level.INFO, bcmessage);
+                                        	}
+                                        }
                                     }
-                            		if (afkmanagerbroadcast)
-                                    {
-                            			tempmessage = afkmanagermoneylog.replace("%NAME%",player.getName());
-                                    	tempmessage = tempmessage.replace("%MONEY%",economy.format(afkmanagermoney));
-                                    	getServer().broadcastMessage(plugintag + tempmessage);
-                                    }
-                            	} else {
-                            		if (afkmanagerkillifnomoney) {
-                            		normalkill = false;
-                            		player.damage(10000);
-                            		playerAction(player);
-                            		if (afkmanagernomoneylog.trim() != "" && afkmanagernomoneylog != null)
-                                    {
-                            			log.info(plugintagnocolor + afkmanagernomoneylog.replace("%NAME%",player.getName()));
-                                    }
-                            		}
-                            		if (afkmanagerbroadcast)
-                                    {
-                                    	getServer().broadcastMessage(plugintag + afkmanagernomoneylog.replace("%NAME%",player.getName()));
-                                    }
-                            		
-                            	}
-                            	} else                            	
-                            	if (afkmanagerkill) {
-                            		normalkill = true;
-                            		player.damage(10000);
-                            		playerAction(player);
-                            		if (afkmanagerkilllog.trim() != "" && afkmanagerkilllog != null)
-                                    {
-                                        log.info(plugintagnocolor + afkmanagerkilllog.replace("%NAME%",player.getName()));
-                                    }
-                            		
-                                    if (afkmanagerbroadcast)
-                                    {
-                                    	getServer().broadcastMessage(plugintag + afkmanagerkilllog.replace("%NAME%",player.getName()));
-                                    }
-                            		
-                            	} else                            	
-                            	if (afkmanagerkick) { 
-                                player.kickPlayer("AfkManager!");
-                                if (afkmanagerkicklog.trim() != "" && afkmanagerkicklog != null)
-                                {
-                                    log.info(plugintagnocolor + afkmanagerkicklog.replace("%NAME%",player.getName()));
                                 }
-                            	}
-
                             }
                         }
                     }
                 }
             }
         }, 5, 20);
+        
+        log.log(Level.INFO, getDescription().getName()+" version "+getDescription().getVersion()+" enabled!");
     }
-
-    public void onDisable()
+    
+	public void onDisable()
     {
         log.info(getDescription().getName()+" version "+getDescription().getVersion()+" is disabled!");
         getServer().getScheduler().cancelTasks(this);
     }
-
-    @SuppressWarnings("deprecation")
-    public void reload()
-    {
-        getConfiguration().load();
-        afkmanagerseconds = getConfiguration().getInt("afkmanager.seconds",180);
-        afkmanagerkickmessage = getConfiguration().getString("afkmanager.kickmessage","You've been kicked for being AFK.");
-        afkmanagerbroadcast = getConfiguration().getBoolean("afkmanager.broadcast",false);
-        afkmanagerkicklog = getConfiguration().getString("afkmanager.kicklog","%NAME% got kicked for being AFK.");
-        afkmanagerkilllog = getConfiguration().getString("afkmanager.killlog","%NAME% got killed for being AFK.");
-        afkmanagermoneylog = getConfiguration().getString("afkmanager.moneylog","%NAME% lost %MONEY% for being AFK.");
-        afkmanagernomoneylog = getConfiguration().getString("afkmanager.nomoneylog","%NAME% got killed for being AFK and does not having enough money to pay!.");
-        afkmanagernomoney = getConfiguration().getString("afkmanager.nomoney","You've been killed for being AFK and does not having enough money to pay!");
-        afkmanagerexempts = Arrays.asList(getConfiguration().getString("afkmanager.exempts","").toLowerCase().split(","));
-        afkmanagerkick = getConfiguration().getBoolean("afkmanager.kick",true);
-        afkmanagerkillifnomoney = getConfiguration().getBoolean("afkmanager.killifnomoney",true);
-        afkmanagerkill = getConfiguration().getBoolean("afkmanager.kill",false);
-        afkmanagermoney = getConfiguration().getInt("afkmanager.money",0);
-        afkmanagerkillmessage = getConfiguration().getString("afkmanager.killmessage","You've been killed for being AFK.");
-        afkmanagermoneymessage = getConfiguration().getString("afkmanager.moneymessage","You lost %MONEY% for being AFK.");
-        getConfiguration().save();
-    }
-
+      
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args)
     {
         if(command.getName().equalsIgnoreCase("afkmanager"))
@@ -206,12 +347,12 @@ public class AfkManager extends JavaPlugin
         {
             if((sender instanceof Player && ((Player)sender).hasPermission("afkmanager.admin")) || !(sender instanceof Player))
             {
-                reload();
+            	AfkManagerConfig.loadYamls();
                 if(sender instanceof Player){
                     ((Player)sender).sendMessage(plugintag + "Config reloaded");
                 }
                 else
-                    log.info(plugintagnocolor + "Config reloaded");
+                    log.info(plugintag + "Config reloaded");
             }
         }
             }
@@ -221,6 +362,7 @@ public class AfkManager extends JavaPlugin
 
     public void playerAction(Player player)
     {
-           lastonline.put(player.getName().toLowerCase(),Long.valueOf(System.currentTimeMillis()/1000));
+           lastonline.put(player.getName(),Long.valueOf(System.currentTimeMillis()/1000));
     }
+    
 }
