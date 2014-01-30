@@ -10,7 +10,7 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerChatEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerPickupItemEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 
@@ -29,7 +29,7 @@ public class AfkManagerPlayerListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
-    public void onPlayerChat(PlayerChatEvent event)
+    public void onPlayerChat(AsyncPlayerChatEvent event)
     {
         plugin.playerAction(event.getPlayer());
     }
